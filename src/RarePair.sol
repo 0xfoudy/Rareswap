@@ -26,22 +26,17 @@ contract RarePair is RareERC20 {
         factory = msg.sender;
     }
 
-
     function mint(address to) external returns (uint256 toMint){
-        // dx/dy must be equal to x/y (maybe must check in addliquidity function in router instead of here)
-        uint256 balanceA = IERC20(tokenA).balanceOf(address(this));
-        uint256 balanceB = IERC20(tokenB).balanceOf(address(this));
-        require(balanceA*balanceB >= 10**18, "Provided token amounts too small"); // amountA*amountB would otherwise underflow
+        uint256 balanceA = IERC20(tokenA).balanceOf(address(this)); // X + dx
+        uint256 balanceB = IERC20(tokenB).balanceOf(address(this)); // Y + dy
+        require(balanceA*balanceB >= 10**18, "Provided token amounts too small"); // amountA*amountB needs to be higher than 10^18, would underflow otherwise.
 
-        UD60x18 amountA = ud(balanceA); // X+dx
-        UD60x18 amountB = ud(balanceB); // X+dy
+        UD60x18 amountA = ud(balanceA);  // dx
+        UD60x18 amountB = ud(balanceB);  // dy
         
-        // L1/L0 = (T+s)/T
-        // s = T(L1-L0)/L0
-        //L1 total liquidity = sqrt(X+dx * Y+dy)
         UD60x18 totalSupply = ud(totalSupply());
         if(totalSupply == ud(0)){
-            toMint = intoUint256(sqrt(amountA*amountB)) - INIT_BURNED_LP; // amountA*amountB needs to be higher than 10^18, would underflow otherwise.
+            toMint = intoUint256(sqrt(amountA*amountB)) - INIT_BURNED_LP;
             _mint(address(0), INIT_BURNED_LP);
         }
         else {
@@ -61,8 +56,8 @@ contract RarePair is RareERC20 {
 
         if(feeTo != address(0)){
             uint256 protocolMintShare = toMint * 5 / 10_000; // 0.05% of the amount to mint
-          _mint(feeTo, protocolMintShare); 
-          toMint -= protocolMintShare;
+            toMint -= protocolMintShare;
+            _mint(feeTo, protocolMintShare); 
         }
         _mint(to, toMint);
     }

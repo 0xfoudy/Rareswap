@@ -44,6 +44,14 @@ contract RareSwapTest is Test {
         assertEq(createdPair, address(factory.allPairs(0)));
         assertEq(IERC20(createdPair).totalSupply(), 2 * amountADesired);
         assertEq(IERC20(createdPair).balanceOf(address(this)), 2 * amountADesired - LIQUIDITY_BURN);
+
+        router.addLiquidity(address(tokenA), address(tokenB), amountADesired, amountBDesired*2, amountADesired, amountADesired);
+        createdPair = factory.pairs(address(tokenA), address(tokenB));
+
+        assertEq(factory.allPairsLength(), 1);
+        assertEq(createdPair, address(factory.allPairs(0)));
+        assertEq(IERC20(createdPair).totalSupply(), 3 * amountADesired);
+        assertEq(IERC20(createdPair).balanceOf(address(this)), 3 * amountADesired - LIQUIDITY_BURN);
     }
 
         function testAddLiquidity32Dec() public {
