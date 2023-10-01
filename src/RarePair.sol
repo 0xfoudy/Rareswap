@@ -33,7 +33,7 @@ contract RarePair is RareERC20 {
 
         UD60x18 amountA = ud(balanceA);  // dx
         UD60x18 amountB = ud(balanceB);  // dy
-        
+
         UD60x18 totalSupply = ud(totalSupply());
         if(totalSupply == ud(0)){
             toMint = intoUint256(sqrt(amountA*amountB)) - INIT_BURNED_LP;
@@ -60,5 +60,18 @@ contract RarePair is RareERC20 {
             _mint(feeTo, protocolMintShare); 
         }
         _mint(to, toMint);
+    }
+
+    // data must be 0 for regular swap, call uniswapV2Call otherwise (for flashswaps)
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external {
+        if(data.length == 0){
+            if(amount1Out == 0) {
+                SafeERC20.safeTransfer(IERC20(tokenA), to, amount0Out);
+            } 
+            else {
+                require(amount0Out == 0);
+                SafeERC20.safeTransfer(IERC20(tokenB), to, amount1Out);
+            }
+        }
     }
 }

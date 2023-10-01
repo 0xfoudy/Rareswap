@@ -1,7 +1,6 @@
 pragma solidity 0.8.21;
 
 import "./RareFactory.sol";
-import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract RareRouter {
     RareFactory public immutable factory;
@@ -54,11 +53,16 @@ contract RareRouter {
 
     }
 
-    // returns the amount one would require to put in order to get specified amountOut
+    /** 
+     * returns the amount one would require to put in order to get specified amountOut
+     * last element of amounts is amountOut 
+     * */ 
     function getAmountsIn(uint256 amountOut, address[] memory path) public view returns (uint256[] memory amounts) {
+        amounts = new uint256[](path.length);
+        amounts[0] = amountOut;
         for(uint256 i = 0; i < path.length - 1; ++i) {
             (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[0], path[1]);
-            amounts[i] = _getAmountIn(amountOut, reserveIn, reserveOut);
+            amounts[i+1] = _getAmountIn(amountOut, reserveIn, reserveOut);
         }
     }
 
@@ -69,11 +73,16 @@ contract RareRouter {
         return numerator / denominator + 1; // + 1 to round up and make sure user provides a little bit more
     }
 
-    // returns the amount one would receive for putting in amountIn
+    /**
+     * returns the amount one would receive for putting in amountIn
+     * first element of amounts is amountIn 
+     * */
     function getAmountsOut(uint256 amountIn, address[] memory path) public view returns (uint256[] memory amounts) {
+        amounts = new uint256[](path.length);
+        amounts[0] = amountIn;
         for(uint256 i = 0; i < path.length - 1; ++i) {
             (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[0], path[1]);
-            amounts[i] = _getAmountIn(amountIn, reserveIn, reserveOut);
+            amounts[i+1] = _getAmountOut(amountIn, reserveIn, reserveOut);
         } 
     }
 
@@ -85,11 +94,37 @@ contract RareRouter {
         return numerator / denominator;
     }
 
-    function swapExactTokenForAmount(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts) {
+    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts) {
+        amounts = getAmountsOut(amountIn, path);
+        uint256 length = path.length - 1;
+        require(amounts[length] >= amountOutMin, "Insufficient amountOutMin");
+        for(uint256 i = 0; i < length; ++i) {
+            RarePair pair = RarePair(factory.pairs(path[i], path[i+1]));
+            SafeERC20.safeTransferFrom(IERC20(path[i]), msg.sender, address(pair), amounts[0]);
 
+            if(path[i] == pair.tokenA()) {
+                pair.swap(0, amounts[i+1], to, "");
+            }
+            else {
+                pair.swap(amounts[i+1], 0, to, "");
+            }
+        }
     }
 
-    function swapTokenForExactAmount(uint256 amountOut, uint256 amountInMax, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts) {
-        
+    function swapTokensForExactTokens(uint256 amountOut, uint256 amountInMax, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts) {
+        amounts = getAmountsIn(amountOut, path);
+        uint256 length = path.length - 1;
+        require(amounts[length] <= amountInMax, "Insufficient amountOutMin");
+        for(uint256 i = 0; i < length; ++i) {
+            RarePair pair = RarePair(factory.pairs(path[i], path[i+1]));
+            SafeERC20.safeTransferFrom(IERC20(path[i]), msg.sender, address(pair), amounts[0]);
+
+            if(path[i] == pair.tokenA()) {
+                pair.swap(0, amounts[i+1], to, "");
+            }
+            else {
+                pair.swap(amounts[i+1], 0, to, "");
+            }
+        }
     }
 }

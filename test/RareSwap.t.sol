@@ -154,4 +154,44 @@ contract RareSwapTest is Test {
         assertEq(totalSupply, 10**16 + 10**20);
         assertEq(IERC20(createdPair).balanceOf(address(this)), 10**16 + 10**20 - 10**3);
     }
+
+    function testAddLiqAndSwap() public {
+        tokenA = new DummyToken("Token A", "A", 10**10 * 10**18, 18);
+        tokenB = new DummyToken("Token B", "B", 10**10 * 10**18, 18);
+        DummyToken tokenC = new DummyToken("Token C", "C", 10**10 * 10**18, 18);
+        DummyToken tokenD = new DummyToken("Token D", "D", 10**10 * 10**18, 18);
+
+        address[] memory path1 = new address[](2);
+        path1[0] = address(tokenA);
+        path1[1] = address(tokenB);
+
+        address[] memory path2 = new address[](4);
+        path2[0] = address(tokenA);
+        path2[1] = address(tokenB);
+        path2[2] = address(tokenC);
+        path2[3] = address(tokenD);
+
+        RareFactory factory = router.factory();
+        assertEq(factory.allPairsLength(), 0);
+        assertEq(factory.pairs(address(tokenA), address(tokenB)), address(0));
+
+        uint256 amountADesired = 2 * 10**20;
+        uint256 amountBDesired = 2 * 10**20;
+
+        tokenA.approve(address(router), 10**32);
+        tokenB.approve(address(router), 10**32);
+        tokenC.approve(address(router), 10**32);
+        tokenD.approve(address(router), 10**32);
+
+        router.addLiquidity(address(tokenA), address(tokenB), amountADesired, amountBDesired, amountADesired, amountBDesired);
+        router.addLiquidity(address(tokenB), address(tokenC), amountADesired, amountADesired, 0, 0);
+        router.addLiquidity(address(tokenC), address(tokenD), amountADesired, amountADesired, 0, 0);
+
+        uint256[] memory amounts = router.swapExactTokensForTokens(100000, 0, path1, address(2), 0);
+        assertEq(IERC20(tokenB).balanceOf(address(2)), 99699);
+        assertEq(amounts[0], 100000);
+        assertEq(amounts[1], 99699);
+    }
 }
+
+
