@@ -62,7 +62,7 @@ contract RareRouter {
         amounts[0] = amountOut;
         for(uint256 i = 0; i < path.length - 1; ++i) {
             (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[0], path[1]);
-            amounts[i+1] = _getAmountIn(amountOut, reserveIn, reserveOut);
+            amounts[i+1] = _getAmountIn(amounts[i], reserveIn, reserveOut);
         }
     }
 
@@ -82,7 +82,7 @@ contract RareRouter {
         amounts[0] = amountIn;
         for(uint256 i = 0; i < path.length - 1; ++i) {
             (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[0], path[1]);
-            amounts[i+1] = _getAmountOut(amountIn, reserveIn, reserveOut);
+            amounts[i+1] = _getAmountOut(amounts[i], reserveIn, reserveOut);
         } 
     }
 
@@ -95,12 +95,18 @@ contract RareRouter {
     }
 
     function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts) {
+        address oldTo = to;
+
         amounts = getAmountsOut(amountIn, path);
         uint256 length = path.length - 1;
         require(amounts[length] >= amountOutMin, "Insufficient amountOutMin");
         for(uint256 i = 0; i < length; ++i) {
             RarePair pair = RarePair(factory.pairs(path[i], path[i+1]));
-            SafeERC20.safeTransferFrom(IERC20(path[i]), msg.sender, address(pair), amounts[0]);
+
+            SafeERC20.safeTransferFrom(IERC20(path[i]), msg.sender, address(pair), amounts[i]);
+
+            if(i < length - 1) to = msg.sender;
+            else to = oldTo;
 
             if(path[i] == pair.tokenA()) {
                 pair.swap(0, amounts[i+1], to, "");
@@ -112,12 +118,17 @@ contract RareRouter {
     }
 
     function swapTokensForExactTokens(uint256 amountOut, uint256 amountInMax, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts) {
+        address oldTo = to;
+        
         amounts = getAmountsIn(amountOut, path);
         uint256 length = path.length - 1;
         require(amounts[length] <= amountInMax, "Insufficient amountOutMin");
         for(uint256 i = 0; i < length; ++i) {
             RarePair pair = RarePair(factory.pairs(path[i], path[i+1]));
-            SafeERC20.safeTransferFrom(IERC20(path[i]), msg.sender, address(pair), amounts[0]);
+            SafeERC20.safeTransferFrom(IERC20(path[i]), msg.sender, address(pair), amounts[i]);
+
+            if(i < length - 1) to = msg.sender;
+            else to = oldTo;
 
             if(path[i] == pair.tokenA()) {
                 pair.swap(0, amounts[i+1], to, "");
