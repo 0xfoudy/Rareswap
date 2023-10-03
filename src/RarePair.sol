@@ -47,8 +47,6 @@ contract RarePair is RareERC20 {
             toMint = intoUint256(tdxByX < tdyByY ? tdxByX : tdyByY); // min(Tdx/X, Tdy/y) or simply sqrt(dx*dy)
         }
 
-        reserveA = amountA; // update X
-        reserveB = amountB; // update Y
 
         require(toMint > 0, "Not enough liquidity minted");
 
@@ -60,6 +58,8 @@ contract RarePair is RareERC20 {
             _mint(feeTo, protocolMintShare); 
         }
         _mint(to, toMint);
+        
+        _updateReserves();
     }
 
     // data must be 0 for regular swap, call uniswapV2Call otherwise (for flashswaps)
@@ -73,5 +73,11 @@ contract RarePair is RareERC20 {
                 SafeERC20.safeTransfer(IERC20(tokenB), to, amount1Out);
             }
         }
+        _updateReserves();
+    }
+
+    function _updateReserves() internal {
+        reserveA = ud(IERC20(tokenA).balanceOf(address(this)));
+        reserveB = ud(IERC20(tokenB).balanceOf(address(this)));
     }
 }

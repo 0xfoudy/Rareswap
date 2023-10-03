@@ -184,13 +184,41 @@ contract RareSwapTest is Test {
         tokenD.approve(address(router), 10**32);
 
         router.addLiquidity(address(tokenA), address(tokenB), amountADesired, amountBDesired, amountADesired, amountBDesired);
-        router.addLiquidity(address(tokenB), address(tokenC), amountADesired, amountADesired, 0, 0);
-        router.addLiquidity(address(tokenC), address(tokenD), amountADesired, amountADesired, 0, 0);
+        RarePair pairAB = RarePair(factory.pairs(address(tokenA), address(tokenB)));
+        uint256 reserveAB_A = intoUint256(pairAB.reserveA());
+        uint256 reserveAB_B = intoUint256(pairAB.reserveB());  
 
+        router.addLiquidity(address(tokenB), address(tokenC), amountADesired, amountADesired, 0, 0);
+       // RarePair pairBC = RarePair(factory.pairs(address(tokenB), address(tokenC)));
+        //uint256 reserveBC_B = intoUint256(pairAB.reserveA());
+       // uint256 reserveBC_C = intoUint256(pairAB.reserveB());
+
+        router.addLiquidity(address(tokenC), address(tokenD), amountADesired, amountADesired, 0, 0);
+       // RarePair pairCD = RarePair(factory.pairs(address(tokenC), address(tokenD)));
+       // uint256 reserveCD_C = intoUint256(pairAB.reserveA());
+        //uint256 reserveCD_D = intoUint256(pairAB.reserveB());
+
+        // swap A for B
         uint256[] memory amounts = router.swapExactTokensForTokens(100000, 0, path1, address(2), 0);
         assertEq(IERC20(tokenB).balanceOf(address(2)), 99699);
         assertEq(amounts[0], 100000);
         assertEq(amounts[1], 99699);
+
+        // test that reserves are updating properly
+        assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]);
+        assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]);
+
+        reserveAB_A = intoUint256(pairAB.reserveA());
+        reserveAB_B = intoUint256(pairAB.reserveB());  
+
+        amounts = router.swapExactTokensForTokens(100000000, 0, path1, address(2), 0);
+        assertEq(IERC20(tokenB).balanceOf(address(2)), 99799698);
+        assertEq(amounts[0], 100000000);
+        assertEq(amounts[1], 99699999);
+
+        // test that reserves are updating properly
+        assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]);
+        assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]);
     }
 }
 
