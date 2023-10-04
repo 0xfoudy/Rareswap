@@ -290,7 +290,7 @@ contract RareSwapTest is Test {
         // test that reserves are updating properly
         assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]);
         assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]);
-/*
+
         reserveAB_A = intoUint256(pairAB.reserveA());
         reserveAB_B = intoUint256(pairAB.reserveB());  
 
@@ -302,7 +302,7 @@ contract RareSwapTest is Test {
         // test that reserves are updating properly
         assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]);
         assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]);
- */  }
+   }
 
     function testAddLiqAB_BC_CD_AndSwapForExactAB_BC_CD() public {
         tokenA = new DummyToken("Token A", "A", 10**10 * 10**18, 18);
@@ -360,7 +360,28 @@ contract RareSwapTest is Test {
         assertEq(intoUint256(pairCD.reserveA()) - reserveCD_C, amounts[2]); // reserve C of CD up by amounts[3]
         assertEq(reserveCD_D - intoUint256(pairCD.reserveB()), amounts[3]); // reserve D of CD down by amounts[0]
     }
-}
 
+function testAddLiquidityAndBurn() public {
+        tokenA = new DummyToken("Token A", "A", 10**8 * 10**18, 18);
+        tokenB = new DummyToken("Token B", "B", 10**10 * 10**18, 18);
+
+        RareFactory factory = router.factory();
+        assertEq(factory.allPairsLength(), 0);
+        assertEq(factory.pairs(address(tokenA), address(tokenB)), address(0));
+
+        uint256 amountADesired = 10**8 * 10**18;
+        uint256 amountBDesired = 10**4 * 10**18;
+
+        tokenA.approve(address(router), 10**32);
+        tokenB.approve(address(router), 10**32);
+
+        router.addLiquidity(address(tokenA), address(tokenB),amountADesired, amountBDesired, amountADesired, amountBDesired);
+        address createdPair = factory.pairs(address(tokenA), address(tokenB));
+        IERC20(createdPair).approve(address(router), 10**32);
+        (uint256 amountA, uint256 amountB) = router.removeLiquidity(address(tokenA), address(tokenB), IERC20(createdPair).balanceOf(address(this))/2, 0, 0, address(2), 0);
+        assertEq(amountA, (10**8 * 10**18 / 2) - 50_000);
+        assertEq(amountB, (10**4 * 10**18 / 2) - 5);
+    }
+}
 
 

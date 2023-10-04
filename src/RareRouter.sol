@@ -49,8 +49,14 @@ contract RareRouter {
         amountB = (reserveB * amountAIn) / reserveA;
     }
 
-    function removeLiquidity() public{
-
+    // a = L*s/T (s liquidity, L sqrt(XY), T total shares)
+    function removeLiquidity(address tokenA_, address tokenB_, uint256 liquidity_, uint256 amountAMin_, uint256 amountBMin_, address to_, uint256 deadline_) external returns (uint256 amountA, uint256 amountB){
+        address pair = factory.pairs(tokenA_, tokenB_);
+        require(pair != address(0), "Pair doesn't exist");
+        
+        SafeERC20.safeTransferFrom(IERC20(pair), msg.sender, pair, liquidity_);
+        (amountA, amountB) = RarePair(pair).burn(to_);
+        require(amountA > amountAMin_ && amountB > amountBMin_, "Minimum amounts too low");
     }
 
     /** 
