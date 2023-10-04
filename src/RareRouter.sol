@@ -55,22 +55,23 @@ contract RareRouter {
 
     /** 
      * returns the amount one would require to put in order to get specified amountOut
-     * last element of amounts is amountOut 
+     * first element of amounts is amountOut 
      * */ 
     function getAmountsIn(uint256 amountOut, address[] memory path) public view returns (uint256[] memory amounts) {
         amounts = new uint256[](path.length);
-        amounts[0] = amountOut;
-        for(uint256 i = 0; i < path.length - 1; ++i) {
-            (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[0], path[1]);
-            amounts[i+1] = _getAmountIn(amounts[i], reserveIn, reserveOut);
+        amounts[path.length - 1] = amountOut;
+        for(uint256 i = path.length - 1; i > 0; --i) {
+            (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[i], path[i-1]);
+            amounts[i-1] = _getAmountIn(amounts[i], reserveIn, reserveOut);
         }
     }
-
+    
+    // dx = Xdy / (Y-dy)
     function _getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256 amountIn) {
         require(reserveOut > 0 && reserveIn > 0, "Not enough tokens in reserve");
         uint256 numerator = reserveIn * amountOut * 1000;
         uint256 denominator = (reserveOut - amountOut) * 997;
-        return numerator / denominator + 1; // + 1 to round up and make sure user provides a little bit more
+        return (numerator / denominator) + 1; // + 1 to round up and make sure user provides a little bit more
     }
 
     /**
@@ -81,11 +82,12 @@ contract RareRouter {
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
         for(uint256 i = 0; i < path.length - 1; ++i) {
-            (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[0], path[1]);
+            (uint256 reserveIn, uint256 reserveOut) = factory.getReserves(path[i], path[i+1]);
             amounts[i+1] = _getAmountOut(amounts[i], reserveIn, reserveOut);
-        } 
+        }
     }
 
+    // dy = Ydx / (X+dx)
     function _getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256 amountOut) {
         require(reserveOut > 0 && reserveIn > 0, "Not enough tokens in reserve");
         uint256 amountInAfterFee = amountIn * 997;

@@ -257,6 +257,109 @@ contract RareSwapTest is Test {
         assertEq(intoUint256(pairCD.reserveA()) - reserveCD_C, amounts[2]);
         assertEq(reserveCD_D - intoUint256(pairCD.reserveB()), amounts[3]);
     }
+
+        function testAddLiqABAndSwapForExactAB() public {
+        tokenA = new DummyToken("Token A", "A", 10**10 * 10**18, 18);
+        tokenB = new DummyToken("Token B", "B", 10**10 * 10**18, 18);
+
+        address[] memory path1 = new address[](2);
+        path1[0] = address(tokenA);
+        path1[1] = address(tokenB);
+
+        RareFactory factory = router.factory();
+        assertEq(factory.allPairsLength(), 0);
+        assertEq(factory.pairs(address(tokenA), address(tokenB)), address(0));
+
+        uint256 amountADesired = 2 * 10**20;
+        uint256 amountBDesired = 2 * 10**20;
+
+        tokenA.approve(address(router), 10**32);
+        tokenB.approve(address(router), 10**32);
+
+        router.addLiquidity(address(tokenA), address(tokenB), amountADesired, amountBDesired, amountADesired, amountBDesired);
+        RarePair pairAB = RarePair(factory.pairs(address(tokenA), address(tokenB)));
+        uint256 reserveAB_A = intoUint256(pairAB.reserveA());
+        uint256 reserveAB_B = intoUint256(pairAB.reserveB());  
+
+        // swap A for B
+        uint256[] memory amounts = router.swapTokensForExactTokens(100000, 110000, path1, address(2), 0);
+        assertEq(IERC20(tokenB).balanceOf(address(2)), 100000);
+        assertEq(amounts[0], 100301);
+        assertEq(amounts[1], 100000);
+
+        // test that reserves are updating properly
+        assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]);
+        assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]);
+/*
+        reserveAB_A = intoUint256(pairAB.reserveA());
+        reserveAB_B = intoUint256(pairAB.reserveB());  
+
+        amounts = router.swapTokensForExactTokens(100000000, 110000000, path1, address(2), 0);
+        assertEq(IERC20(tokenB).balanceOf(address(2)), 100100000);
+        assertEq(amounts[0], 100300903);
+        assertEq(amounts[1], 100000000);
+
+        // test that reserves are updating properly
+        assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]);
+        assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]);
+ */  }
+
+    function testAddLiqAB_BC_CD_AndSwapForExactAB_BC_CD() public {
+        tokenA = new DummyToken("Token A", "A", 10**10 * 10**18, 18);
+        tokenB = new DummyToken("Token B", "B", 10**10 * 10**18, 18);
+        DummyToken tokenC = new DummyToken("Token C", "C", 10**10 * 10**18, 18);
+        DummyToken tokenD = new DummyToken("Token D", "D", 10**10 * 10**18, 18);
+
+        address[] memory path2 = new address[](4);
+        path2[0] = address(tokenA);
+        path2[1] = address(tokenB);
+        path2[2] = address(tokenC);
+        path2[3] = address(tokenD);
+
+        RareFactory factory = router.factory();
+        assertEq(factory.allPairsLength(), 0);
+        assertEq(factory.pairs(address(tokenA), address(tokenB)), address(0));
+
+        uint256 amountADesired = 2 * 10**20;
+        uint256 amountBDesired = 2 * 10**20;
+
+        tokenA.approve(address(router), 10**32);
+        tokenB.approve(address(router), 10**32);
+        tokenC.approve(address(router), 10**32);
+        tokenD.approve(address(router), 10**32);
+
+        router.addLiquidity(address(tokenA), address(tokenB), amountADesired, amountBDesired, amountADesired, amountBDesired);
+        RarePair pairAB = RarePair(factory.pairs(address(tokenA), address(tokenB)));
+        uint256 reserveAB_A = intoUint256(pairAB.reserveA());
+        uint256 reserveAB_B = intoUint256(pairAB.reserveB());  
+
+        router.addLiquidity(address(tokenB), address(tokenC), amountADesired, amountADesired, 0, 0);
+        RarePair pairBC = RarePair(factory.pairs(address(tokenB), address(tokenC)));
+        uint256 reserveBC_B = intoUint256(pairAB.reserveA());
+        uint256 reserveBC_C = intoUint256(pairAB.reserveB());
+
+        router.addLiquidity(address(tokenC), address(tokenD), amountADesired, amountADesired, 0, 0);
+        RarePair pairCD = RarePair(factory.pairs(address(tokenC), address(tokenD)));
+        uint256 reserveCD_C = intoUint256(pairAB.reserveA());
+        uint256 reserveCD_D = intoUint256(pairAB.reserveB());
+
+        // swap A for B
+        uint256[] memory amounts = router.swapTokensForExactTokens(10**15, 2*10**15, path2, address(2), 0);
+        assertEq(amounts[0], 1_009_069_452_852_359);
+        assertEq(amounts[1], 1_006_037_183_914_269);
+        assertEq(amounts[2], 1_003_014_042_151_455);
+        assertEq(amounts[3], 10**15);
+        assertEq(IERC20(tokenB).balanceOf(address(2)), 0);
+        assertEq(IERC20(tokenD).balanceOf(address(2)), 10**15);
+
+        // test that reserves are updating properly
+        assertEq(intoUint256(pairAB.reserveA()) - reserveAB_A, amounts[0]); // reserve A of AB up by amounts[1]
+        assertEq(reserveAB_B - intoUint256(pairAB.reserveB()), amounts[1]); // reserve B of AB down by amounts[2]
+        assertEq(intoUint256(pairBC.reserveA()) - reserveBC_B, amounts[1]); // reserve B of BC up by amounts[2]
+        assertEq(reserveBC_C - intoUint256(pairBC.reserveB()), amounts[2]); // reserve C of BC down by amounts[3]
+        assertEq(intoUint256(pairCD.reserveA()) - reserveCD_C, amounts[2]); // reserve C of CD up by amounts[3]
+        assertEq(reserveCD_D - intoUint256(pairCD.reserveB()), amounts[3]); // reserve D of CD down by amounts[0]
+    }
 }
 
 
