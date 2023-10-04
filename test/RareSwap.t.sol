@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {Test, console2} from "forge-std/Test.sol";
 import "../src/RareRouter.sol";
 import "../src/utils/DummyToken.sol";
+import "openzeppelin-contracts/contracts/interfaces/IERC3156FlashBorrower.sol";
 
 contract RareSwapTest is Test {
     RareRouter public router;
@@ -381,6 +382,92 @@ function testAddLiquidityAndBurn() public {
         (uint256 amountA, uint256 amountB) = router.removeLiquidity(address(tokenA), address(tokenB), IERC20(createdPair).balanceOf(address(this))/2, 0, 0, address(2), 0);
         assertEq(amountA, (10**8 * 10**18 / 2) - 50_000);
         assertEq(amountB, (10**4 * 10**18 / 2) - 5);
+    }
+
+    function testAddLiquidityAndFlashLoan() public {
+        tokenA = new DummyToken("Token A", "A", 10**8 * 10**18, 18);
+        tokenB = new DummyToken("Token B", "B", 10**10 * 10**18, 18);
+        RareFactory factory = router.factory();
+        assertEq(factory.allPairsLength(), 0);
+        assertEq(factory.pairs(address(tokenA), address(tokenB)), address(0));
+
+        uint256 amountADesired = 10**4 * 10**18;
+        uint256 amountBDesired = 10**4 * 10**18;
+
+        tokenA.approve(address(router), 10**32);
+        tokenB.approve(address(router), 10**32);
+
+        router.addLiquidity(address(tokenA), address(tokenB),amountADesired, amountBDesired, amountADesired, amountBDesired);
+        address createdPair = factory.pairs(address(tokenA), address(tokenB));
+        RarePair rarePair = RarePair(createdPair);
+        IERC20(createdPair).approve(address(router), 10**32);
+        uint256 reserveA = intoUint256(rarePair.reserveA());
+
+        Borrower flashBorrower = new Borrower(rarePair);
+        tokenA.transfer(address(flashBorrower), 10**2 * 10**18);
+        vm.expectRevert();
+        rarePair.flashLoan(IERC3156FlashBorrower(address(2)), address(tokenA), 10**4 * 10**18, "");
+        
+        flashBorrower.flashBorrow(address(tokenA), 10**4 * 10**18);
+        assertEq(intoUint256(rarePair.reserveA()), reserveA + reserveA * 3/1000 + 1);
+    }
+
+    function testAddLiquidity32DecLimits() public {
+        tokenA = new DummyToken("Token A", "A", (10**8 * 10**32), 32);
+        tokenB = new DummyToken("Token B", "B", (10**10 * 10**32), 32);
+
+        RareFactory factory = router.factory();
+        assertEq(factory.allPairsLength(), 0);
+        assertEq(factory.pairs(address(tokenA), address(tokenB)), address(0));
+
+        uint256 amountADesired = 10**8 * 10**32;
+        uint256 amountBDesired = 10**32;
+        tokenA.approve(address(router), 10**10 * 10**32);
+        tokenB.approve(address(router), 10**10 * 10**32);
+
+        router.addLiquidity(address(tokenA), address(tokenB), amountADesired, amountBDesired, amountADesired, amountBDesired);
+        address createdPair = factory.pairs(address(tokenA), address(tokenB));
+    }
+}
+
+contract Borrower is IERC3156FlashBorrower {
+    IERC3156FlashLender lender;
+
+    constructor (
+        IERC3156FlashLender lender_
+    ) {
+        lender = lender_;
+    }
+
+    /// @dev ERC-3156 Flash loan callback
+    function onFlashLoan(
+        address initiator,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external override returns(bytes32) {
+        require(
+            msg.sender == address(lender),
+            "FlashBorrower: Untrusted lender"
+        );
+        require(
+            initiator == address(this),
+            "FlashBorrower: Untrusted loan initiator"
+        );
+        return keccak256("ERC3156FlashBorrower.onFlashLoan");
+    }
+
+    /// @dev Initiate a flash loan
+    function flashBorrow(
+        address token,
+        uint256 amount
+    ) public {
+        uint256 _allowance = IERC20(token).allowance(address(this), address(lender));
+        uint256 _fee = lender.flashFee(token, amount);
+        uint256 _repayment = amount + _fee;
+        IERC20(token).approve(address(lender), _allowance + _repayment);
+        lender.flashLoan(this, token, amount, "");
     }
 }
 

@@ -38,7 +38,12 @@ contract RarePair is RareERC20, IERC3156FlashLender {
         require(
             balanceA * balanceB >= 10 ** 18,
             "Provided token amounts too small"
-        ); // amountA*amountB needs to be higher than 10^18, would underflow otherwise.
+        ); // amountA*amountB needs to be higher than 10^18, would underflow otherwise in UD form.
+
+        require(
+            balanceA * balanceB <= 10 ** 72,
+            "Provided token amounts too large"
+        ); // amountA*amountB needs to be lower than 10^72, would overflow otherwise in UD form.
 
         UD60x18 amountA = ud(balanceA); // dx
         UD60x18 amountB = ud(balanceB); // dy
@@ -118,7 +123,7 @@ contract RarePair is RareERC20, IERC3156FlashLender {
     }
 
     function _flashFee(uint256 amount) internal pure returns (uint256) {
-        return (amount * 997 / 1000) + 1;
+        return (amount * 3 / 1000) + 1;
     }
 
     function flashLoan(
@@ -128,10 +133,11 @@ contract RarePair is RareERC20, IERC3156FlashLender {
         bytes calldata data
     ) external override returns (bool) {
         require(supportedTokens[token], "Unsupported token");
-        _updateReserves();
         uint256 fee = _flashFee(amount);
 
         SafeERC20.safeTransfer(IERC20(token), address(receiver), amount);
+
+        _updateReserves(); // updating in case of reentrancy on onFlashLoan
 
         require(receiver.onFlashLoan(msg.sender, token, amount, fee, data) == CALLBACK_SUCCESS, "FlashLender: Callback failed");
         

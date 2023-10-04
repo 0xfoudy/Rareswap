@@ -117,10 +117,10 @@ contract RareRouter {
             else to = oldTo;
 
             if(path[i] == pair.tokenA()) {
-                pair.swap(0, amounts[i+1], to, "");
+                pair.swap(0, amounts[i+1], to);
             }
             else {
-                pair.swap(amounts[i+1], 0, to, "");
+                pair.swap(amounts[i+1], 0, to);
             }
         }
     }
@@ -139,10 +139,10 @@ contract RareRouter {
             else to = oldTo;
 
             if(path[i] == pair.tokenA()) {
-                pair.swap(0, amounts[i+1], to, "");
+                pair.swap(0, amounts[i+1], to);
             }
             else {
-                pair.swap(amounts[i+1], 0, to, "");
+                pair.swap(amounts[i+1], 0, to);
             }
         }
     }
